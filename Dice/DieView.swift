@@ -6,11 +6,11 @@
 //  Copyright © 2016 Sebastian. All rights reserved.
 //
 
-import AppKit
+import Cocoa
 
-class DieView: NSView {
+class DieView: NSView, NSDraggingSource {
     
-    var intValue: Int? = 6 {
+    var intValue: Int? = 1 {
         didSet {
             needsDisplay = true
         }
@@ -22,37 +22,31 @@ class DieView: NSView {
         }
     }
     
-    @IBAction func savePDF(sender: AnyObject!) {
-        let savePanel = NSSavePanel()
-        savePanel.allowedFileTypes = ["pdf"]
-        savePanel.beginSheetModalForWindow(window!) {
-            [unowned savePanel] (result) in
-            if result == NSModalResponseOK {
-                let data = self.dataWithPDFInsideRect(self.bounds)
-                do {
-                    try data.writeToURL(savePanel.URL!,
-                                        options: NSDataWritingOptions.DataWritingAtomic)
-                } catch let error as NSError {
-                    let alert = NSAlert(error: error)
-                    alert.runModal()
-                } catch {
-                    fatalError("unknown error")
-                }
-            }
+    var highlightForDragging: Bool = false {
+        didSet {
+            needsDisplay = true
         }
     }
     
-    @IBAction func cut(sender: AnyObject?) {
-        writeToPasteboard(NSPasteboard.generalPasteboard())
-        intValue = nil
+    var mouseDownEvent: NSEvent?
+    
+    
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        commonInit()
+    }
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        commonInit()
     }
     
-    @IBAction func copy(sender: AnyObject?) {
-        writeToPasteboard(NSPasteboard.generalPasteboard())
+    func commonInit() {
+        self.registerForDraggedTypes([NSPasteboardTypeString])
     }
     
-    @IBAction func paste(sender: AnyObject?) {
-        readFromPasteboard(NSPasteboard.generalPasteboard())
+    
+    func randomize() {
+        intValue = Int(arc4random_uniform(5) + 1)
     }
     
     override var intrinsicContentSize: NSSize {
@@ -64,7 +58,13 @@ class DieView: NSView {
         backgroundColor.set()
         NSBezierPath.fillRect(bounds)
         
-        drawDieWithSize(bounds.size)
+        if highlightForDragging {
+            let gradient = NSGradient(startingColor: NSColor.whiteColor(), endingColor: backgroundColor)!
+            gradient.drawInRect(bounds, relativeCenterPosition: NSZeroPoint)
+        }
+        else {
+            drawDieWithSize(bounds.size)
+        }
     }
     
     func metricsForSize(size: CGSize) -> (edgeLength: CGFloat, dieFrame: CGRect) {
@@ -72,18 +72,16 @@ class DieView: NSView {
         let padding = edgeLength/10.0
         let drawingBounds = CGRect(x: 0, y: 0, width: edgeLength, height: edgeLength)
         var dieFrame = drawingBounds.insetBy(dx: padding, dy: padding)
-        
         if pressed {
-            dieFrame = dieFrame.insetBy(dx: 0, dy: -edgeLength/40)
+            dieFrame = dieFrame.offsetBy(dx: 0, dy: -edgeLength/40)
         }
-        
         return (edgeLength, dieFrame)
     }
     
     func drawDieWithSize(size: CGSize) {
         if let intValue = intValue {
             let (edgeLength, dieFrame) = metricsForSize(size)
-            let cornerRadius: CGFloat = edgeLength/5.0
+            let cornerRadius:CGFloat = edgeLength/5.0
             let dotRadius = edgeLength/12.0
             let dotFrame = dieFrame.insetBy(dx: dotRadius * 2.5, dy: dotRadius * 2.5)
             
@@ -126,45 +124,138 @@ class DieView: NSView {
                     drawDot(0, 0.5) // mid left/right
                     drawDot(1, 0.5)
                 }
-            } else {
-                
+            }
+            else {
                 let paraStyle = NSParagraphStyle.defaultParagraphStyle().mutableCopy() as! NSMutableParagraphStyle
                 paraStyle.alignment = .Center
-                
-                let font = NSFont.systemFontOfSize(edgeLength * 0.5)
-                let attrs = [NSForegroundColorAttributeName: NSColor.blackColor(), NSFontAttributeName: font, NSParagraphStyleAttributeName: paraStyle]
-                
+                let font = NSFont.systemFontOfSize(edgeLength * 0.6)
+                let attrs = [
+                    NSForegroundColorAttributeName: NSColor.blackColor(),
+                    NSFontAttributeName: font,
+                    NSParagraphStyleAttributeName: paraStyle ]
                 let string = "\(intValue)" as NSString
                 string.drawCenteredInRect(dieFrame, attributes: attrs)
             }
         }
     }
     
-    func randomize() {
-        intValue = Int(arc4random_uniform(5)) + 1
-    }
-    
-    //MARK: - Mouse Events
-    
-    override func mouseUp(theEvent: NSEvent) {
-        if theEvent.clickCount == 2 {
-            randomize()
+    @IBAction func savePDF(sender: AnyObject!) {
+        let savePanel = NSSavePanel()
+        savePanel.allowedFileTypes = ["pdf"]
+        savePanel.beginSheetModalForWindow(window!) {
+            [unowned savePanel] (result) in
+            if result == NSModalResponseOK {
+                let data = self.dataWithPDFInsideRect(self.bounds)
+                do {
+                    try data.writeToURL(savePanel.URL!,
+                                        options: NSDataWritingOptions.DataWritingAtomic)
+                } catch let error as NSError {
+                    let alert = NSAlert(error: error)
+                    alert.runModal()
+                } catch {
+                    fatalError("unknown error")
+                }
+            }
         }
-        
-        pressed = true
     }
+    
+    // MARK: - Mouse Events
     
     override func mouseDown(theEvent: NSEvent) {
+        Swift.print("mouseDown")
+        mouseDownEvent = theEvent
+        
         let dieFrame = metricsForSize(bounds.size).dieFrame
         let pointInView = convertPoint(theEvent.locationInWindow, fromView: nil)
         pressed = dieFrame.contains(pointInView)
     }
+    override func mouseDragged(theEvent: NSEvent) {
+        Swift.print("mouseDragged location: \(theEvent.locationInWindow)")
+        
+        let downPoint = mouseDownEvent!.locationInWindow
+        let dragPoint = theEvent.locationInWindow
+        
+        let distanceDragged = hypot(downPoint.x - dragPoint.x, downPoint.y - dragPoint.y)
+        if distanceDragged < 3 {
+            return
+        }
+        
+        pressed = false
+        
+        if let intValue = intValue {
+            let imageSize = bounds.size
+            let image = NSImage(size: imageSize, flipped: false) { (imageBounds) in
+                self.drawDieWithSize(imageBounds.size)
+                return true
+            }
+            
+            let draggingFrameOrigin = convertPoint(downPoint, fromView: nil)
+            let draggingFrame = NSRect(origin: draggingFrameOrigin, size: imageSize)
+                .offsetBy(dx: -imageSize.width/2, dy: -imageSize.height/2)
+            
+            let item = NSDraggingItem(pasteboardWriter: "\(intValue)")
+            item.draggingFrame = draggingFrame
+            item.imageComponentsProvider = {
+                let component = NSDraggingImageComponent(key: NSDraggingImageComponentIconKey)
+                component.contents = image
+                component.frame = NSRect(origin: NSPoint(), size: imageSize)
+                return [component]
+            }
+            
+            beginDraggingSessionWithItems([item], event:mouseDownEvent!, source: self)
+        }
+    }
+    override func mouseUp(theEvent: NSEvent) {
+        Swift.print("mouseUp clickCount: \(theEvent.clickCount)")
+        if theEvent.clickCount == 2 && pressed {
+            randomize()
+        }
+        pressed = false
+    }
     
-    //MARK: - First Responder
+    // MARK: - Drag Source
     
-    override var acceptsFirstResponder: Bool {
+    func draggingSession(session: NSDraggingSession, sourceOperationMaskForDraggingContext context: NSDraggingContext) -> NSDragOperation {
+        return [.Copy, .Delete]
+    }
+    
+    func draggingSession(session: NSDraggingSession, endedAtPoint screenPoint: NSPoint, operation: NSDragOperation) {
+        if operation == .Delete {
+            intValue = nil
+        }
+    }
+    
+    // MARK: - Drag Destination
+    
+    override func draggingEntered(sender: NSDraggingInfo) -> NSDragOperation {
+        if sender.draggingSource() === self {
+            return .None
+        }
+        highlightForDragging = true
+        return sender.draggingSourceOperationMask()
+    }
+    
+    override func draggingExited(sender: NSDraggingInfo?) {
+        highlightForDragging = false
+    }
+    
+    override func prepareForDragOperation(sender: NSDraggingInfo) -> Bool {
         return true
     }
+    
+    override func performDragOperation(sender: NSDraggingInfo) -> Bool {
+        let ok = readFromPasteboard(sender.draggingPasteboard())
+        return ok
+    }
+    
+    override func concludeDragOperation(sender: NSDraggingInfo?) {
+        highlightForDragging = false
+    }
+    
+    
+    // MARK: - First Responder
+    
+    override var acceptsFirstResponder: Bool { return true  }
     
     override func becomeFirstResponder() -> Bool {
         return true
@@ -175,14 +266,15 @@ class DieView: NSView {
     }
     
     override func drawFocusRingMask() {
+        // Try this:
+        //drawDieWithSize(bounds.size)
         NSBezierPath.fillRect(bounds)
     }
-    
     override var focusRingMaskBounds: NSRect {
         return bounds
     }
     
-    //MARK: - Keyboard Events
+    // MARK: Keyboard Events
     
     override func keyDown(theEvent: NSEvent) {
         interpretKeyEvents([theEvent])
@@ -198,15 +290,13 @@ class DieView: NSView {
     override func insertTab(sender: AnyObject?) {
         window?.selectNextKeyView(sender)
     }
-    
     override func insertBacktab(sender: AnyObject?) {
         window?.selectPreviousKeyView(sender)
     }
     
-    //MARK: - Pasteboard
+    // MARK: - Pasteboard
     
     func writeToPasteboard(pasteboard: NSPasteboard) {
-        
         if let intValue = intValue {
             pasteboard.clearContents()
             pasteboard.writeObjects(["\(intValue)"])
@@ -215,12 +305,22 @@ class DieView: NSView {
     
     func readFromPasteboard(pasteboard: NSPasteboard) -> Bool {
         let objects = pasteboard.readObjectsForClasses([NSString.self], options: [:]) as! [String]
-        
         if let str = objects.first {
             intValue = Int(str)
             return true
         }
-        
         return false
     }
+    
+    @IBAction func cut(sender: AnyObject?) {
+        writeToPasteboard(NSPasteboard.generalPasteboard())
+        intValue = nil
+    }
+    @IBAction func copy(sender: AnyObject?) {
+        writeToPasteboard(NSPasteboard.generalPasteboard())
+    }
+    @IBAction func paste(sender: AnyObject?) {
+        readFromPasteboard(NSPasteboard.generalPasteboard())
+    }
+    
 }
