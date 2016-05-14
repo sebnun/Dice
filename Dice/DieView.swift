@@ -15,6 +15,12 @@ class DieView: NSView {
         }
     }
     
+    var pressed: Bool = false {
+        didSet {
+            needsDisplay = true
+        }
+    }
+    
     override var intrinsicContentSize: NSSize {
         return NSSize(width: 20, height: 20)
     }
@@ -31,7 +37,12 @@ class DieView: NSView {
         let edgeLength = min(size.width, size.height)
         let padding = edgeLength/10.0
         let drawingBounds = CGRect(x: 0, y: 0, width: edgeLength, height: edgeLength)
-        let dieFrame = drawingBounds.insetBy(dx: padding, dy: padding)
+        var dieFrame = drawingBounds.insetBy(dx: padding, dy: padding)
+        
+        if pressed {
+            dieFrame = dieFrame.insetBy(dx: 0, dy: -edgeLength/40)
+        }
+        
         return (edgeLength, dieFrame)
     }
     
@@ -46,7 +57,7 @@ class DieView: NSView {
             
             let shadow = NSShadow()
             shadow.shadowOffset = NSSize(width: 0, height: -1)
-            shadow.shadowBlurRadius = edgeLength/20
+            shadow.shadowBlurRadius = (pressed ? edgeLength/100 : edgeLength/20)
             shadow.set()
             
             NSColor.whiteColor().set()
@@ -83,4 +94,25 @@ class DieView: NSView {
                 }
             }
         }
-    }}
+    }
+    
+    func randomize() {
+        intValue = Int(arc4random_uniform(5)) + 1
+    }
+    
+    //MARK: - Mouse Events
+    
+    override func mouseUp(theEvent: NSEvent) {
+        if theEvent.clickCount == 2 {
+            randomize()
+        }
+        
+        pressed = true
+    }
+    
+    override func mouseDown(theEvent: NSEvent) {
+        let dieFrame = metricsForSize(bounds.size).dieFrame
+        let pointInView = convertPoint(theEvent.locationInWindow, fromView: nil)
+        pressed = dieFrame.contains(pointInView)
+    }
+}
