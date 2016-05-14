@@ -42,6 +42,19 @@ class DieView: NSView {
         }
     }
     
+    @IBAction func cut(sender: AnyObject?) {
+        writeToPasteboard(NSPasteboard.generalPasteboard())
+        intValue = nil
+    }
+    
+    @IBAction func copy(sender: AnyObject?) {
+        writeToPasteboard(NSPasteboard.generalPasteboard())
+    }
+    
+    @IBAction func paste(sender: AnyObject?) {
+        readFromPasteboard(NSPasteboard.generalPasteboard())
+    }
+    
     override var intrinsicContentSize: NSSize {
         return NSSize(width: 20, height: 20)
     }
@@ -188,5 +201,26 @@ class DieView: NSView {
     
     override func insertBacktab(sender: AnyObject?) {
         window?.selectPreviousKeyView(sender)
+    }
+    
+    //MARK: - Pasteboard
+    
+    func writeToPasteboard(pasteboard: NSPasteboard) {
+        
+        if let intValue = intValue {
+            pasteboard.clearContents()
+            pasteboard.writeObjects(["\(intValue)"])
+        }
+    }
+    
+    func readFromPasteboard(pasteboard: NSPasteboard) -> Bool {
+        let objects = pasteboard.readObjectsForClasses([NSString.self], options: [:]) as! [String]
+        
+        if let str = objects.first {
+            intValue = Int(str)
+            return true
+        }
+        
+        return false
     }
 }
