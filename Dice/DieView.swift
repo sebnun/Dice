@@ -9,6 +9,7 @@
 import AppKit
 
 class DieView: NSView {
+    
     var intValue: Int? = 6 {
         didSet {
             needsDisplay = true
@@ -18,6 +19,26 @@ class DieView: NSView {
     var pressed: Bool = false {
         didSet {
             needsDisplay = true
+        }
+    }
+    
+    @IBAction func savePDF(sender: AnyObject!) {
+        let savePanel = NSSavePanel()
+        savePanel.allowedFileTypes = ["pdf"]
+        savePanel.beginSheetModalForWindow(window!) {
+            [unowned savePanel] (result) in
+            if result == NSModalResponseOK {
+                let data = self.dataWithPDFInsideRect(self.bounds)
+                do {
+                    try data.writeToURL(savePanel.URL!,
+                                        options: NSDataWritingOptions.DataWritingAtomic)
+                } catch let error as NSError {
+                    let alert = NSAlert(error: error)
+                    alert.runModal()
+                } catch {
+                    fatalError("unknown error")
+                }
+            }
         }
     }
     
@@ -92,6 +113,16 @@ class DieView: NSView {
                     drawDot(0, 0.5) // mid left/right
                     drawDot(1, 0.5)
                 }
+            } else {
+                
+                let paraStyle = NSParagraphStyle.defaultParagraphStyle().mutableCopy() as! NSMutableParagraphStyle
+                paraStyle.alignment = .Center
+                
+                let font = NSFont.systemFontOfSize(edgeLength * 0.5)
+                let attrs = [NSForegroundColorAttributeName: NSColor.blackColor(), NSFontAttributeName: font, NSParagraphStyleAttributeName: paraStyle]
+                
+                let string = "\(intValue)" as NSString
+                string.drawCenteredInRect(dieFrame, attributes: attrs)
             }
         }
     }
