@@ -115,4 +115,47 @@ class DieView: NSView {
         let pointInView = convertPoint(theEvent.locationInWindow, fromView: nil)
         pressed = dieFrame.contains(pointInView)
     }
+    
+    //MARK: - First Responder
+    
+    override var acceptsFirstResponder: Bool {
+        return true
+    }
+    
+    override func becomeFirstResponder() -> Bool {
+        return true
+    }
+    
+    override func resignFirstResponder() -> Bool {
+        return true
+    }
+    
+    override func drawFocusRingMask() {
+        NSBezierPath.fillRect(bounds)
+    }
+    
+    override var focusRingMaskBounds: NSRect {
+        return bounds
+    }
+    
+    //MARK: - Keyboard Events
+    
+    override func keyDown(theEvent: NSEvent) {
+        interpretKeyEvents([theEvent])
+    }
+    
+    override func insertText(insertString: AnyObject) {
+        let text = insertString as! String
+        if let number = Int(text) {
+            intValue = number
+        }
+    }
+    
+    override func insertTab(sender: AnyObject?) {
+        window?.selectNextKeyView(sender)
+    }
+    
+    override func insertBacktab(sender: AnyObject?) {
+        window?.selectPreviousKeyView(sender)
+    }
 }
