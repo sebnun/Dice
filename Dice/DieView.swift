@@ -28,6 +28,14 @@ class DieView: NSView, NSDraggingSource {
         }
     }
     
+    var color: NSColor = NSColor.whiteColor() {
+        didSet {
+            needsDisplay = true
+        }
+    }
+    
+    var numberOfTimesToRoll: Int = 10
+    
     var mouseDownEvent: NSEvent?
     var rollsRemaining: Int = 0
     
@@ -46,7 +54,7 @@ class DieView: NSView, NSDraggingSource {
     
     
     func roll() {
-        rollsRemaining = 10
+        rollsRemaining = numberOfTimesToRoll
         NSTimer.scheduledTimerWithTimeInterval(0.15, target: self, selector: #selector(DieView.rollTick(_:)), userInfo: nil, repeats: true)
         window?.makeFirstResponder(nil)
     }
@@ -77,7 +85,7 @@ class DieView: NSView, NSDraggingSource {
         NSBezierPath.fillRect(bounds)
         
         if highlightForDragging {
-            let gradient = NSGradient(startingColor: NSColor.whiteColor(), endingColor: backgroundColor)!
+            let gradient = NSGradient(startingColor: color, endingColor: backgroundColor)!
             gradient.drawInRect(bounds, relativeCenterPosition: NSZeroPoint)
         }
         else {
@@ -110,7 +118,7 @@ class DieView: NSView, NSDraggingSource {
             shadow.shadowBlurRadius = (pressed ? edgeLength/100 : edgeLength/20)
             shadow.set()
             
-            NSColor.whiteColor().set()
+            color.set()
             NSBezierPath(roundedRect: dieFrame, xRadius: cornerRadius, yRadius: cornerRadius).fill()
             
             NSGraphicsContext.restoreGraphicsState()
