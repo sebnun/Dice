@@ -29,7 +29,7 @@ class DieView: NSView, NSDraggingSource {
     }
     
     var mouseDownEvent: NSEvent?
-    
+    var rollsRemaining: Int = 0
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -44,6 +44,24 @@ class DieView: NSView, NSDraggingSource {
         self.registerForDraggedTypes([NSPasteboardTypeString])
     }
     
+    
+    func roll() {
+        rollsRemaining = 10
+        NSTimer.scheduledTimerWithTimeInterval(0.15, target: self, selector: #selector(DieView.rollTick(_:)), userInfo: nil, repeats: true)
+        window?.makeFirstResponder(nil)
+    }
+    
+    func rollTick(sender: NSTimer) {
+        let lastIntValue = intValue
+        while intValue == lastIntValue {
+            randomize()
+        }
+        rollsRemaining -= 1
+        if rollsRemaining == 0 {
+            sender.invalidate()
+            window?.makeFirstResponder(self)
+        }
+    }
     
     func randomize() {
         intValue = Int(arc4random_uniform(5) + 1)
@@ -190,8 +208,7 @@ class DieView: NSView, NSDraggingSource {
             }
             
             let draggingFrameOrigin = convertPoint(downPoint, fromView: nil)
-            let draggingFrame = NSRect(origin: draggingFrameOrigin, size: imageSize)
-                .offsetBy(dx: -imageSize.width/2, dy: -imageSize.height/2)
+            let draggingFrame = NSRect(origin: draggingFrameOrigin, size: imageSize).offsetBy(dx: -imageSize.width/2, dy: -imageSize.height/2)
             
             let item = NSDraggingItem(pasteboardWriter: "\(intValue)")
             item.draggingFrame = draggingFrame
@@ -208,7 +225,7 @@ class DieView: NSView, NSDraggingSource {
     override func mouseUp(theEvent: NSEvent) {
         Swift.print("mouseUp clickCount: \(theEvent.clickCount)")
         if theEvent.clickCount == 2 && pressed {
-            randomize()
+            roll()
         }
         pressed = false
     }
